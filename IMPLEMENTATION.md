@@ -9,3 +9,5 @@
 The UARB endpoint timed out from this environment on 2026-09-20, so live browser selectors and counts remain unverified. Do not treat screenshot labels in `DESIGN.md` as verified selectors.
 
 Run all local tests with `python3 -m unittest discover -s tests -v`. When the site is reachable, run `npm run probe:uarb` to capture the entry page text and screenshot before implementing browser locators. The probe reports the last browser URL and attempts a diagnostic screenshot on failure. Set `UARB_TIMEOUT_MS=60000` to allow a slower connection more time.
+
+An offline end-to-end demonstration is available with `python3 -m senpilot.local_demo examples/request.eml examples/snapshot.json artifacts/local-demo --agent-address agent@example.com`. It writes an unsent `reply.eml` and ZIP. The example snapshot and document are invented fixtures, not UARB data. The local demo does not send email or use the SQLite job ledger.

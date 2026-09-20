@@ -1,0 +1,27 @@
+{
+  "matter_number": "M12205",
+  "requested_type": "Other Documents",
+  "title": "Local demonstration matter (not UARB data)",
+  "matter_type": "Demonstration",
+  "category": "Fixture",
+  "initial_filing_date": null,
+  "final_filing_date": null,
+  "counts": {
+    "Exhibits": 0,
+    "Key Documents": 0,
+    "Other Documents": 1,
+    "Transcripts": 0,
+    "Recordings": 0
+  },
+  "documents": [
+    {
+      "site_document_id": "sample-1",
+      "title": "Local demonstration document",
+      "date": null,
+      "extension": "txt",
+      "original_filename": "sample-document.txt",
+      "source_url": null,
+      "path": "sample-document.txt"
+    }
+  ]
+}
