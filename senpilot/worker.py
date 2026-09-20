@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from threading import Event
 from typing import Callable
 
 from .archive import Download, build_archive, select_documents
@@ -99,3 +100,21 @@ def run_once(
     for incoming in messages:
         process_incoming(incoming, mailbox, sender, retrieve, agent_address, max_attachment_bytes)
     return len(messages)
+
+
+def run_forever(
+    mailbox: Mailbox,
+    sender: MailSender,
+    retrieve: Retriever,
+    agent_address: str,
+    poll_interval_seconds: float = 60,
+    stop: Event | None = None,
+    max_attachment_bytes: int = 20 * 1024 * 1024,
+) -> None:
+    """Poll the mailbox until stopped; each pass handles currently unseen mail."""
+    if poll_interval_seconds <= 0:
+        raise ValueError("poll_interval_must_be_positive")
+    stop = stop or Event()
+    while not stop.is_set():
+        run_once(mailbox, sender, retrieve, agent_address, max_attachment_bytes)
+        stop.wait(poll_interval_seconds)

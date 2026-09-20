@@ -46,7 +46,7 @@ def retrieve_uarb(request: Request, workspace: Path) -> RetrievalResult:
         if not isinstance(methods, dict) or set(methods) != set(CATEGORIES):
             raise RetrievalError("invalid_count_methods")
         for category in CATEGORIES:
-            if methods[category] not in {"found_count", "paged_rows", "unavailable"}:
+            if methods[category] not in {"tab_total", "found_count", "paged_rows", "unavailable"}:
                 raise RetrievalError("invalid_count_methods")
             if (methods[category] == "unavailable") != (counts[category] is None):
                 raise RetrievalError("count_method_mismatch")

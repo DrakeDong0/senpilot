@@ -5,7 +5,8 @@ from senpilot.archive import Document, Download
 from senpilot.intake import Request
 from senpilot.mail import IncomingMail
 from senpilot.reply import MatterSummary
-from senpilot.worker import RetrievalError, RetrievalResult, process_incoming
+from senpilot.worker import RetrievalError, RetrievalResult, process_incoming, run_forever
+from unittest.mock import patch
 
 
 def summary(count=1):
@@ -107,6 +108,28 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual(mailbox.seen, [b"5"])
         self.assertEqual(list(sender.messages[0].iter_attachments()), [])
         self.assertIn("retrieval did not complete", sender.messages[0].get_content())
+
+    def test_polling_repeats_until_stopped(self):
+        class StopAfterTwo:
+            def __init__(self):
+                self.calls = 0
+
+            def is_set(self):
+                return self.calls >= 2
+
+            def wait(self, seconds):
+                self.calls += 1
+
+        stop = StopAfterTwo()
+        with patch("senpilot.worker.run_once", return_value=0) as run:
+            run_forever(FakeMailbox(), FakeSender(), lambda *_: self.fail(),
+                        "agent@example.com", poll_interval_seconds=5, stop=stop)
+        self.assertEqual(run.call_count, 2)
+
+    def test_poll_interval_must_be_positive(self):
+        with self.assertRaisesRegex(ValueError, "poll_interval_must_be_positive"):
+            run_forever(FakeMailbox(), FakeSender(), lambda *_: self.fail(),
+                        "agent@example.com", poll_interval_seconds=0)
 
 
 if __name__ == "__main__":

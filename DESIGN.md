@@ -10,6 +10,8 @@ An incoming email specifies one matter number and one document type. The agent o
 
 The supported types are **Exhibits**, **Key Documents**, **Other Documents**, **Transcripts**, and **Recordings**. The site screenshot also shows **Hearings** and **Related Matters** tabs; these are outside the assignment's requested categories and are excluded from document counts. Matter numbers follow `M` plus five digits, such as `M12205`.
 
+The Board's current database guide labels the recordings tab **Audio Files** and says a tab with a displayed count of zero does not open. Map an email request for Recordings to Audio Files when that is the live tab label. The guide also says **Go Get It** opens a filename confirmation button before the browser download starts; verify this behavior against the live page.
+
 The first version processes one matter and one category per email. It should not infer missing values, claim a download succeeded before checking the file, or report a count from only the first page of a paginated tab.
 
 ## 2. Required behavior and acceptance criteria
@@ -191,3 +193,4 @@ Store a redacted run log and screenshots at important browser steps to diagnose 
 
 - *Senpilot’s Technical Assignment — Winter 2027*, supplied PDF, pages 2–4 (requirements and UI screenshots).
 - [Nova Scotia UARB Public Documents Database](https://uarb.novascotia.ca/fmi/webd/UARB15) (live entry point; JavaScript application).
+- [Nova Scotia Energy Board: How to Use the Database](https://nserbt.ca/nseb/matters-evidence/how-use-database) (tab counts, Audio Files label, and filename confirmation step).
