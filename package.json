@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "scripts": {
+    "probe:uarb": "node scripts/probe-uarb.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.63.0"
+  }
+}
