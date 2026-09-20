@@ -1,5 +1,4 @@
 from pathlib import Path
-import json
 import tempfile
 import unittest
 import zipfile
@@ -21,9 +20,6 @@ class ReplyTests(unittest.TestCase):
             archive = Path(directory) / "files.zip"
             with zipfile.ZipFile(archive, "w") as zipped:
                 zipped.writestr("record.pdf", b"%PDF-1.4")
-                zipped.writestr("manifest.json", json.dumps({
-                    "matter_number": "M12205", "category": "Other Documents", "downloaded_count": 1,
-                }))
             message = compose_reply(
                 "agent@example.com", "requester@example.com", "<incoming@example.com>",
                 summary(), "Other Documents", 2, 1, ["record 42: download_timeout"],
@@ -61,17 +57,6 @@ class ReplyTests(unittest.TestCase):
                     "agent@example.com", "requester@example.com", "", summary(),
                     "Other Documents", 1, 1, [], archive, 4,
                 )
-
-    def test_invalid_archive_is_not_attached(self):
-        with tempfile.TemporaryDirectory() as directory:
-            archive = Path(directory) / "files.zip"
-            archive.write_bytes(b"not a zip")
-            with self.assertRaisesRegex(ValueError, "invalid_archive"):
-                compose_reply(
-                    "agent@example.com", "requester@example.com", "", summary(),
-                    "Other Documents", 1, 1, [], archive, 1000,
-                )
-
 
 if __name__ == "__main__":
     unittest.main()

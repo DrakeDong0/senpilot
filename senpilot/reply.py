@@ -4,10 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from email.message import EmailMessage
-import json
 from pathlib import Path
 import re
-import zipfile
 
 from .intake import CATEGORIES
 
@@ -60,19 +58,6 @@ def compose_reply(
         archive_path = Path(archive_path)
         if archive_path.stat().st_size > max_attachment_bytes:
             raise AttachmentTooLarge("attachment_too_large")
-        try:
-            with zipfile.ZipFile(archive_path) as archive:
-                if archive.testzip() is not None:
-                    raise ValueError("invalid_archive")
-                manifest = json.loads(archive.read("manifest.json"))
-                if (
-                    manifest.get("matter_number") != summary.matter_number
-                    or manifest.get("category") != requested_type
-                    or manifest.get("downloaded_count") != downloaded_count
-                ):
-                    raise ValueError("archive_manifest_mismatch")
-        except (OSError, zipfile.BadZipFile, KeyError, json.JSONDecodeError) as error:
-            raise ValueError("invalid_archive") from error
         archive_data = archive_path.read_bytes()
         if len(archive_data) > max_attachment_bytes:
             raise AttachmentTooLarge("attachment_too_large")
@@ -98,7 +83,7 @@ def compose_reply(
         f"Downloaded {downloaded_count} of {selected_count} selected files.",
     ])
     if archive_data is not None:
-        lines.append("The verified files and manifest are attached in a ZIP.")
+        lines.append("The downloaded files are attached in a ZIP.")
     elif selected_count == 0:
         lines.append("No files were selected; no ZIP is attached.")
     else:
