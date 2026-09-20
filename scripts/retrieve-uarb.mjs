@@ -34,19 +34,27 @@ async function openMatter(page) {
   const field = page.getByText("eg M01234", { exact: true })
     .locator("xpath=../div[contains(@class, 'text')]");
   await (await unique(field, "matter search field")).click();
-  await page.keyboard.type(matter);
+  await page.waitForFunction(() => document.querySelector(".fm_object_254 .text")?.getAttribute("contenteditable") === "true");
+  await field.fill(matter);
+  await field.press("Tab");
   const search = page.locator("button[id*='o258']");
   await (await unique(search, "direct matter search button")).click();
-  await page.getByText(matter, { exact: true }).first().waitFor();
+  await page.waitForFunction(() => document.body.innerText.includes("Back to Search Results")
+    || document.body.innerText.includes("No Records Found"), undefined, { timeout: 30000 });
+  if (await page.getByText("No Records Found", { exact: true }).count()) {
+    throw new Error(`No UARB records found for ${matter}`);
+  }
+  const shownMatter = (await page.locator(".fm_object_286 .text").innerText()).trim();
+  if (shownMatter !== matter) throw new Error(`UARB displayed ${shownMatter} instead of ${matter}`);
 }
 
 async function categoryTab(page, category) {
   for (const label of SITE_LABELS[category]) {
-    let tab = page.getByRole("tab", { name: new RegExp(`^${label}(?:\\s|$)`, "i") });
+    let tab = page.getByRole("button", { name: new RegExp(`^${label}\\s*-\\s*\\d[\\d,]*$`, "i") });
     if (await tab.count() === 1) return tab;
-    tab = page.getByText(label, { exact: true }).filter({ visible: true });
+    tab = page.getByRole("tab", { name: new RegExp(`^${label}(?:\\s|$)`, "i") });
     if (await tab.count() === 1) return tab;
-    tab = page.getByText(new RegExp(`^${label}\\s*\\(?\\d[\\d,]*\\)?$`, "i"))
+    tab = page.getByText(new RegExp(`^${label}\\s*(?:-\\s*|\\(?)(?:\\d[\\d,]*)\\)?$`, "i"))
       .filter({ visible: true });
     if (await tab.count() === 1) return tab;
   }
@@ -90,25 +98,19 @@ async function readFoundCount(page) {
 }
 
 async function getButtons(page) {
-  let buttons = page.getByRole("button", { name: "Go Get It", exact: true });
-  if (await buttons.count() === 0) buttons = page.getByText("Go Get It", { exact: true }).filter({ visible: true });
-  return buttons;
+  return page.getByRole("button", { name: /^Go Get It$/i });
 }
 
 async function startDocumentDownload(page, button) {
-  const pending = page.waitForEvent("download", { timeout: 30000 });
   await button.click();
-  const filenameButton = page.getByRole("button", { name: /\.[a-z0-9]{2,8}$/i }).filter({ visible: true });
-  const first = await Promise.race([
-    pending.then(download => ({ download })),
-    filenameButton.first().waitFor({ timeout: 8000 })
-      .then(() => ({ filenameButton }))
-      .catch(() => ({ modalTimeout: true })),
+  const filenameButton = page.locator(".fm-download-button").filter({ visible: true });
+  await filenameButton.first().waitFor({ timeout: 30000 });
+  const [download] = await Promise.all([
+    page.waitForEvent("download", { timeout: 30000 }),
+    (await unique(filenameButton, "download filename button")).click(),
   ]);
-  if (first.download) return first.download;
-  if (first.modalTimeout) return await pending;
-  await (await unique(first.filenameButton, "download filename button")).click();
-  return await pending;
+  await page.getByText("Close", { exact: true }).filter({ visible: true }).click();
+  return download;
 }
 
 async function getNextButton(page) {
@@ -119,12 +121,27 @@ async function getNextButton(page) {
 
 async function advancePage(page) {
   const next = await getNextButton(page);
-  if (await next.count() === 0) return false;
-  if (await next.count() !== 1) throw new Error("Ambiguous Next page control");
-  if (!(await next.isEnabled())) return false;
-  const before = await page.locator("body").innerText();
-  await next.click();
-  await page.waitForFunction(previous => document.body.innerText !== previous, before, { timeout: 10000 });
+  if (await next.count()) {
+    if (await next.count() !== 1) throw new Error("Ambiguous Next page control");
+    if (!(await next.isEnabled())) return false;
+    const before = await page.locator("body").innerText();
+    await next.click();
+    await page.waitForFunction(previous => document.body.innerText !== previous, before, { timeout: 10000 });
+    return true;
+  }
+  const scroller = page.locator(".v-grid-scroller-vertical");
+  if (await scroller.count() !== 1) return false;
+  if (await page.locator(".v-grid-row").count() === 0) return false;
+  const before = await page.locator(".v-grid-row").first().innerText();
+  const moved = await scroller.evaluate(element => {
+    const previous = element.scrollTop;
+    element.scrollTop += element.clientHeight;
+    element.dispatchEvent(new Event("scroll", { bubbles: true }));
+    return element.scrollTop > previous;
+  });
+  if (!moved) return false;
+  await page.waitForFunction(previous => document.querySelector(".v-grid-row")?.innerText !== previous,
+    before, { timeout: 10000 });
   return true;
 }
 
@@ -135,13 +152,16 @@ async function countCategory(page) {
     if (foundCount < visibleRows) throw new Error("Found Count is smaller than visible document rows");
     return { count: foundCount, method: "found_count" };
   }
-  let total = 0;
+  const seen = new Set();
   let pages = 0;
   do {
-    total += await (await getButtons(page)).count();
+    for (const row of await page.locator(".v-grid-row").all()) {
+      seen.add((await row.innerText()).trim());
+    }
     pages++;
     if (pages > 1000) throw new Error("Document pagination exceeded 1000 pages");
   } while (await advancePage(page));
+  const total = seen.size;
   if (total === 0) {
     const text = await page.locator("body").innerText();
     if (!/\b(?:no (?:records|documents|results)|0 records)\b/i.test(text)) {
@@ -153,10 +173,16 @@ async function countCategory(page) {
 
 async function downloadUpToTen(page, categoryCount) {
   const records = [];
+  const seen = new Set();
   await mkdir(directory, { recursive: true });
   if (categoryCount === 0) {
     if (await (await getButtons(page)).count() > 0) throw new Error("Zero count conflicts with visible download controls");
     return records;
+  }
+  if (categoryCount !== null) await (await getButtons(page)).first().waitFor({ timeout: 30000 });
+  const foundCount = await readFoundCount(page);
+  if (categoryCount !== null && foundCount !== null && foundCount !== categoryCount) {
+    throw new Error(`Requested category tab total ${categoryCount} differs from Found Count ${foundCount}`);
   }
   while (records.length < 10) {
     const buttons = await getButtons(page);
@@ -164,11 +190,15 @@ async function downloadUpToTen(page, categoryCount) {
     for (let index = 0; index < visibleCount && records.length < 10; index++) {
       const button = buttons.nth(index);
       const row = button.locator("xpath=ancestor::*[@role='row' or self::tr][1]");
-      const title = await row.count() ? (await row.innerText()).trim().slice(0, 300) : null;
+      const rowLines = await row.count()
+        ? (await row.innerText()).split("\n").map(line => line.trim()).filter(Boolean) : [];
+      const rowKey = rowLines.join("\n");
+      if (seen.has(rowKey)) continue;
+      seen.add(rowKey);
       const record = {
-        site_document_id: null,
-        title,
-        date: null,
+        site_document_id: /^\d+$/.test(rowLines[0] ?? "") ? rowLines[0] : null,
+        title: rowLines[1]?.slice(0, 300) ?? null,
+        date: /^\d{2}\/\d{2}\/\d{4}$/.test(rowLines[2] ?? "") ? rowLines[2] : null,
         extension: null,
         original_filename: null,
         source_url: page.url(),
@@ -211,6 +241,18 @@ try {
   const page = await context.newPage();
   await openMatter(page);
   const headerText = await page.locator("body").innerText();
+  const matterMetadata = {
+    title: (await page.locator("[id*='o290i0i0']").innerText()).split("\n")[0].trim()
+      || labeledValue(headerText, "Matter (?:Title|Name)") || labeledValue(headerText, "Title"),
+    matter_type: (await page.locator(".fm_object_298 .text").innerText()).trim()
+      || labeledValue(headerText, "(?:Matter )?Type"),
+    category: (await page.locator(".fm_object_287 .text").innerText()).trim()
+      || labeledValue(headerText, "Category"),
+    initial_filing_date: (await page.locator(".fm_object_292 .text").innerText()).trim()
+      || labeledValue(headerText, "Initial Filing(?: Date)?")
+      || labeledValue(headerText, "Date Received"),
+    final_filing_date: (await page.locator(".fm_object_294 .text").innerText()).trim() || null,
+  };
   const counts = {};
   const countMethod = {};
   for (const category of CATEGORIES) {
@@ -223,7 +265,9 @@ try {
     counts[category] = measured.count;
     countMethod[category] = measured.method;
   }
-  await openMatter(page);
+  if (Object.values(countMethod).some(method => method === "paged_rows" || method === "found_count")) {
+    await openMatter(page);
+  }
   let documents = [];
   if (counts[requested] !== 0) {
     if (!await openCategory(page, requested)) throw new Error("Requested tab did not confirm navigation");
@@ -232,13 +276,7 @@ try {
   const result = {
     matter_number: matter,
     requested_type: requested,
-    title: labeledValue(headerText, "Matter (?:Title|Name)") ?? labeledValue(headerText, "Title"),
-    matter_type: labeledValue(headerText, "(?:Matter )?Type"),
-    category: labeledValue(headerText, "Category"),
-    initial_filing_date: labeledValue(headerText, "Initial Filing(?: Date)?")
-      ?? labeledValue(headerText, "Date Received"),
-    final_filing_date: labeledValue(headerText, "Final Filing(?: Date)?")
-      ?? labeledValue(headerText, "Date (?:Last Information|Last Filing) Filed"),
+    ...matterMetadata,
     counts,
     count_method: countMethod,
     documents,
