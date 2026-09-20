@@ -6,7 +6,7 @@
 4. **Email workflow (implemented locally):** `senpilot/mail.py` fetches unseen requests over IMAP and sends replies over SMTP/TLS. `senpilot/worker.py` connects intake, UARB retrieval, ZIP creation, reply composition, and sending. It sends a factual failure reply if retrieval cannot complete. `python3 -m senpilot.run` polls the mailbox every 60 seconds; `--once` processes currently unseen mail and exits. No live mailbox or UARB run has been completed.
 5. **Hardening and acceptance:** Add bounded retries, structured logs, cleanup, and live runs across valid, empty, invalid, and partial-failure cases.
 
-The UARB endpoint timed out from this environment on 2026-09-20, so live browser selectors and counts remain unverified. Do not treat screenshot labels in `DESIGN.md` as verified selectors.
+The UARB endpoint became reachable through a North American VPN on 2026-09-20. The entry-page probe returned HTTP 200 and found the direct matter search. A live retrieval of `M12205` still failed: FileMaker renders the matter field as a focusable div, and the attempted keystrokes did not populate it. The script requires an exact matter match before continuing, so counts and downloads remain unverified. Do not treat screenshot labels in `DESIGN.md` as verified selectors.
 
 Run all local tests with `python3 -m unittest discover -s tests -v`. When the site is reachable, run `npm run probe:uarb` to capture the entry page text and screenshot before implementing browser locators. The probe reports the last browser URL and attempts a diagnostic screenshot on failure. Set `UARB_TIMEOUT_MS=60000` to allow a slower connection more time.
 

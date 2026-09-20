@@ -29,26 +29,14 @@ async function unique(locator, description) {
 
 async function openMatter(page) {
   await page.goto(URL, { waitUntil: "domcontentloaded", timeout: 30000 });
-  const label = page.getByText("Go Directly to Matter", { exact: true });
-  await label.waitFor();
-  let panel = label;
-  let search = null;
-  for (let depth = 0; depth < 5; depth++) {
-    panel = panel.locator("xpath=..");
-    let candidate = panel.getByRole("button", { name: "Search", exact: true });
-    if (await candidate.count() === 0) {
-      candidate = panel.getByText("Search", { exact: true }).filter({ visible: true });
-    }
-    if (await candidate.count() === 1 && await panel.locator("input:visible").count() >= 1) {
-      search = candidate;
-      break;
-    }
-  }
-  if (!search) throw new Error("Could not identify the Go Directly to Matter search panel");
-  let input = panel.getByRole("textbox", { name: /Go Directly to Matter/i });
-  if (await input.count() !== 1) input = panel.locator("input:visible");
-  await (await unique(input, "matter search input")).fill(matter);
-  await search.click();
+  await page.getByText("Go Directly to Matter", { exact: true }).waitFor();
+  // FileMaker exposes this field as a focusable div, not a native input.
+  const field = page.getByText("eg M01234", { exact: true })
+    .locator("xpath=../div[contains(@class, 'text')]");
+  await (await unique(field, "matter search field")).click();
+  await page.keyboard.type(matter);
+  const search = page.locator("button[id*='o258']");
+  await (await unique(search, "direct matter search button")).click();
   await page.getByText(matter, { exact: true }).first().waitFor();
 }
 
