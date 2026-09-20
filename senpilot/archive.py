@@ -83,7 +83,7 @@ def build_archive(
             failures.append(f"{label}: {error if isinstance(error, ValueError) else 'file_read_error'}")
 
     if not valid:
-        raise ValueError("no_verified_files")
+        return ArchiveResult(downloaded_count=0, failures=failures)
     destination = Path(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:

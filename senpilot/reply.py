@@ -108,8 +108,12 @@ def compose_reply(
     lines.extend([
         "",
         f"Requested category: {requested_type} ({requested_total if requested_total is not None else 'count unavailable'} records).",
-        f"Downloaded {downloaded_count} of {selected_count} selected files.",
+        (f"Downloaded {downloaded_count} of {requested_total} {requested_type}."
+         if requested_total is not None else
+         f"Downloaded {downloaded_count} {requested_type} files; category count unavailable."),
     ])
+    if selected_count != downloaded_count:
+        lines.append(f"Selected {selected_count} files for download; {selected_count - downloaded_count} did not succeed.")
     if archive_data is not None:
         lines.append("The downloaded files are attached in a ZIP.")
     elif selected_count == 0:

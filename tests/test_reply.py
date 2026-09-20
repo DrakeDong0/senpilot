@@ -33,7 +33,8 @@ class ReplyTests(unittest.TestCase):
             self.assertEqual(attachment.get_content(), archive.read_bytes())
             body = message.get_body(preferencelist=("plain",)).get_content()
             self.assertIn("Total across these five categories: 6", body)
-            self.assertIn("Downloaded 1 of 2 selected files", body)
+            self.assertIn("Downloaded 1 of 3 Other Documents", body)
+            self.assertIn("Selected 2 files for download; 1 did not succeed", body)
             self.assertIn("record 42: download_timeout", body)
 
     def test_unavailable_count_omits_grand_total_and_no_results_omits_zip(self):

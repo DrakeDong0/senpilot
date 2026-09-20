@@ -65,18 +65,13 @@ def process_incoming(
         downloaded_count = 0
         failures = []
         if selected:
-            archive_path = workspace / f"{request.matter_number}_{request.requested_type.replace(' ', '_')}.zip"
-            try:
-                archive_result = build_archive(
-                    request.matter_number, request.requested_type, selected, archive_path,
-                )
-                downloaded_count = archive_result.downloaded_count
-                failures = archive_result.failures
-            except ValueError as error:
-                if str(error) != "no_verified_files":
-                    raise
-                archive_path = None
-                failures = ["All selected downloads failed or were empty."]
+            candidate = workspace / f"{request.matter_number}_{request.requested_type.replace(' ', '_')}.zip"
+            archive_result = build_archive(
+                request.matter_number, request.requested_type, selected, candidate,
+            )
+            downloaded_count = archive_result.downloaded_count
+            failures = archive_result.failures
+            archive_path = candidate if downloaded_count else None
         try:
             reply = compose_reply(
                 agent_address, incoming.sender, incoming.message_id, result.summary,

@@ -48,11 +48,12 @@ class ArchiveTests(unittest.TestCase):
             self.assertEqual(result.downloaded_count, 1)
             self.assertEqual(result.failures, ["2: empty_file", "3: html_response"])
 
-    def test_no_files_does_not_create_zip(self):
+    def test_no_files_reports_failure_without_creating_zip(self):
         with tempfile.TemporaryDirectory() as directory:
             destination = Path(directory) / "result.zip"
-            with self.assertRaisesRegex(ValueError, "no_verified_files"):
-                build_archive("M12205", "Exhibits", [Download(row(), None)], destination)
+            result = build_archive("M12205", "Exhibits", [Download(row(), None)], destination)
+            self.assertEqual(result.downloaded_count, 0)
+            self.assertEqual(result.failures, ["123: missing_file"])
             self.assertFalse(destination.exists())
 
 

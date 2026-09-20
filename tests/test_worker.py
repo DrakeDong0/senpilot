@@ -51,7 +51,7 @@ class WorkerTests(unittest.TestCase):
         process_incoming(incoming, mailbox, sender, retrieve, "agent@example.com")
         self.assertEqual(mailbox.seen, [b"1"])
         self.assertEqual(len(list(sender.messages[0].iter_attachments())), 1)
-        self.assertIn("Downloaded 1 of 1", sender.messages[0].get_body().get_content())
+        self.assertIn("Downloaded 1 of 1 Other Documents", sender.messages[0].get_body().get_content())
 
     def test_ambiguous_request_sends_clarification(self):
         mailbox = FakeMailbox()
@@ -71,6 +71,20 @@ class WorkerTests(unittest.TestCase):
                          "agent@example.com")
         self.assertEqual(list(sender.messages[0].iter_attachments()), [])
         self.assertIn("No files were selected", sender.messages[0].get_content())
+
+    def test_all_downloads_fail_with_specific_reason(self):
+        mailbox = FakeMailbox()
+        sender = FakeSender()
+        incoming = IncomingMail(b"6", "", "user@example.com",
+                                Request("M12205", "Other Documents"))
+
+        def retrieve(*_):
+            document = Document("doc-7", "Record", None, "pdf", "record.pdf", None)
+            return RetrievalResult(summary(), [Download(document, None, "download_timeout")])
+
+        process_incoming(incoming, mailbox, sender, retrieve, "agent@example.com")
+        self.assertEqual(list(sender.messages[0].iter_attachments()), [])
+        self.assertIn("doc-7: download_timeout", sender.messages[0].get_content())
 
     def test_failed_send_does_not_mark_seen(self):
         mailbox = FakeMailbox()
