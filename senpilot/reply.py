@@ -37,6 +37,22 @@ def compose_clarification(sender: str, recipient: str, original_message_id: str,
     return message
 
 
+def compose_retrieval_failure(sender: str, recipient: str, original_message_id: str,
+                              matter_number: str, requested_type: str) -> EmailMessage:
+    """Report that retrieval failed without inventing counts or attachments."""
+    message = EmailMessage()
+    message["From"] = sender
+    message["To"] = recipient
+    message["Subject"] = f"Unable to retrieve {matter_number} — {requested_type}"
+    if original_message_id:
+        message["In-Reply-To"] = original_message_id
+    message.set_content(
+        f"I could not retrieve {requested_type} for {matter_number} from the UARB database. "
+        "I have not attached a ZIP or reported document counts because retrieval did not complete."
+    )
+    return message
+
+
 def compose_reply(
     sender: str,
     recipient: str,

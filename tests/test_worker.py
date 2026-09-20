@@ -5,7 +5,7 @@ from senpilot.archive import Document, Download
 from senpilot.intake import Request
 from senpilot.mail import IncomingMail
 from senpilot.reply import MatterSummary
-from senpilot.worker import RetrievalResult, process_incoming
+from senpilot.worker import RetrievalError, RetrievalResult, process_incoming
 
 
 def summary(count=1):
@@ -79,6 +79,20 @@ class WorkerTests(unittest.TestCase):
             process_incoming(incoming, mailbox, FakeSender(fail=True), lambda *_: self.fail(),
                              "agent@example.com")
         self.assertEqual(mailbox.seen, [])
+
+    def test_retrieval_failure_sends_truthful_reply(self):
+        mailbox = FakeMailbox()
+        sender = FakeSender()
+        incoming = IncomingMail(b"5", "", "user@example.com",
+                                Request("M12205", "Other Documents"))
+
+        def unavailable(*_):
+            raise RetrievalError("site timed out")
+
+        process_incoming(incoming, mailbox, sender, unavailable, "agent@example.com")
+        self.assertEqual(mailbox.seen, [b"5"])
+        self.assertEqual(list(sender.messages[0].iter_attachments()), [])
+        self.assertIn("retrieval did not complete", sender.messages[0].get_content())
 
 
 if __name__ == "__main__":

@@ -10,7 +10,12 @@ from typing import Callable
 from .archive import Download, build_archive, select_documents
 from .intake import Request
 from .mail import IncomingMail, Mailbox, MailSender
-from .reply import AttachmentTooLarge, MatterSummary, compose_clarification, compose_reply
+from .reply import (AttachmentTooLarge, MatterSummary, compose_clarification,
+                    compose_reply, compose_retrieval_failure)
+
+
+class RetrievalError(RuntimeError):
+    """The site retrieval could not establish a verified result."""
 
 
 @dataclass(frozen=True)
@@ -43,7 +48,16 @@ def process_incoming(
     request = incoming.request
     with TemporaryDirectory(prefix="senpilot-") as directory:
         workspace = Path(directory)
-        result = retrieve(request, workspace)
+        try:
+            result = retrieve(request, workspace)
+        except RetrievalError:
+            reply = compose_retrieval_failure(
+                agent_address, incoming.sender, incoming.message_id,
+                request.matter_number, request.requested_type,
+            )
+            sender.send(reply)
+            mailbox.mark_seen(incoming.uid)
+            return
         if result.summary.matter_number != request.matter_number:
             raise ValueError("retrieved_matter_mismatch")
         selected = select_documents(result.downloads)
