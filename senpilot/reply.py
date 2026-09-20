@@ -25,6 +25,18 @@ class AttachmentTooLarge(ValueError):
     pass
 
 
+def compose_clarification(sender: str, recipient: str, original_message_id: str, reason: str) -> EmailMessage:
+    """Ask for a single matter and category when request parsing is ambiguous."""
+    message = EmailMessage()
+    message["From"] = sender
+    message["To"] = recipient
+    message["Subject"] = "Please clarify your document request"
+    if original_message_id:
+        message["In-Reply-To"] = original_message_id
+    message.set_content(reason)
+    return message
+
+
 def compose_reply(
     sender: str,
     recipient: str,
