@@ -72,6 +72,20 @@ class UarbBridgeTests(unittest.TestCase):
                 with self.assertRaisesRegex(RetrievalError, "download_path_outside_workspace"):
                     retrieve_uarb(Request("M12205", "Other Documents"), workspace)
 
+    def test_unavailable_count_cannot_be_reported_as_number(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+
+            def fake_run(command, **kwargs):
+                data = result_for(workspace)
+                data["count_method"] = {category: "found_count" for category in data["counts"]}
+                data["count_method"]["Exhibits"] = "unavailable"
+                (workspace / "result.json").write_text(json.dumps(data))
+
+            with patch("senpilot.uarb.subprocess.run", side_effect=fake_run):
+                with self.assertRaisesRegex(RetrievalError, "count_method_mismatch"):
+                    retrieve_uarb(Request("M12205", "Other Documents"), workspace)
+
     def test_bridge_to_zip_reply_without_network(self):
         class Mailbox:
             seen = []

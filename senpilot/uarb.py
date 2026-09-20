@@ -41,6 +41,15 @@ def retrieve_uarb(request: Request, workspace: Path) -> RetrievalResult:
         raise RetrievalError("invalid_category_counts")
     if any(value is not None and (type(value) is not int or value < 0) for value in counts.values()):
         raise RetrievalError("invalid_category_counts")
+    methods = result.get("count_method")
+    if methods is not None:
+        if not isinstance(methods, dict) or set(methods) != set(CATEGORIES):
+            raise RetrievalError("invalid_count_methods")
+        for category in CATEGORIES:
+            if methods[category] not in {"found_count", "paged_rows", "unavailable"}:
+                raise RetrievalError("invalid_count_methods")
+            if (methods[category] == "unavailable") != (counts[category] is None):
+                raise RetrievalError("count_method_mismatch")
     rows = result.get("documents")
     if not isinstance(rows, list) or len(rows) > 10:
         raise RetrievalError("invalid_document_rows")

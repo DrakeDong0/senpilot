@@ -34,7 +34,7 @@ async function openMatter(page) {
 async function openCategory(page, category) {
   const before = await page.locator("body").innerText();
   let tab = page.getByRole("tab", { name: new RegExp(`^${category}(?:\\s*\\(\\d+\\))?$`, "i") });
-  if (await tab.count() !== 1) tab = page.getByText(category, { exact: true });
+  if (await tab.count() !== 1) tab = page.getByText(category, { exact: true }).filter({ visible: true });
   await (await unique(tab, `${category} tab`)).click();
   await tab.first().waitFor({ state: "visible" });
   if (await tab.getAttribute("aria-selected") === "true") return true;
@@ -60,8 +60,48 @@ async function readFoundCount(page) {
 
 async function getButtons(page) {
   let buttons = page.getByRole("button", { name: "Go Get It", exact: true });
-  if (await buttons.count() === 0) buttons = page.getByText("Go Get It", { exact: true });
+  if (await buttons.count() === 0) buttons = page.getByText("Go Get It", { exact: true }).filter({ visible: true });
   return buttons;
+}
+
+async function getNextButton(page) {
+  let next = page.getByRole("button", { name: /^Next(?: Page)?$/i });
+  if (await next.count() === 0) next = page.getByText("Next", { exact: true }).filter({ visible: true });
+  return next;
+}
+
+async function advancePage(page) {
+  const next = await getNextButton(page);
+  if (await next.count() === 0) return false;
+  if (await next.count() !== 1) throw new Error("Ambiguous Next page control");
+  if (!(await next.isEnabled())) return false;
+  const before = await page.locator("body").innerText();
+  await next.click();
+  await page.waitForFunction(previous => document.body.innerText !== previous, before, { timeout: 10000 });
+  return true;
+}
+
+async function countCategory(page) {
+  const foundCount = await readFoundCount(page);
+  const visibleRows = await (await getButtons(page)).count();
+  if (foundCount !== null) {
+    if (foundCount < visibleRows) throw new Error("Found Count is smaller than visible document rows");
+    return { count: foundCount, method: "found_count" };
+  }
+  let total = 0;
+  let pages = 0;
+  do {
+    total += await (await getButtons(page)).count();
+    pages++;
+    if (pages > 1000) throw new Error("Document pagination exceeded 1000 pages");
+  } while (await advancePage(page));
+  if (total === 0) {
+    const text = await page.locator("body").innerText();
+    if (!/\b(?:no (?:records|documents|results)|0 records)\b/i.test(text)) {
+      return { count: null, method: "unavailable" };
+    }
+  }
+  return { count: total, method: "paged_rows" };
 }
 
 async function downloadUpToTen(page, categoryCount) {
@@ -106,11 +146,7 @@ async function downloadUpToTen(page, categoryCount) {
       records.push(record);
     }
     if (records.length >= 10 || (categoryCount !== null && records.length >= categoryCount)) break;
-    const next = page.getByRole("button", { name: /^Next(?: Page)?$/i });
-    if (await next.count() !== 1 || !(await next.isEnabled())) break;
-    const before = await page.locator("body").innerText();
-    await next.click();
-    await page.waitForFunction(previous => document.body.innerText !== previous, before, { timeout: 10000 });
+    if (!await advancePage(page)) break;
   }
   if (categoryCount !== null && records.length < Math.min(categoryCount, 10)) {
     throw new Error(`Only ${records.length} of ${Math.min(categoryCount, 10)} selected rows were reachable`);
@@ -132,13 +168,15 @@ try {
   await openMatter(page);
   const headerText = await page.locator("body").innerText();
   const counts = {};
-  let lastTransitioned = false;
+  const countMethod = {};
   for (const category of CATEGORIES) {
-    lastTransitioned = await openCategory(page, category);
-    counts[category] = lastTransitioned ? await readFoundCount(page) : null;
+    const transitioned = await openCategory(page, category);
+    const measured = transitioned ? await countCategory(page) : { count: null, method: "unavailable" };
+    counts[category] = measured.count;
+    countMethod[category] = measured.method;
   }
-  const requestedReady = requested === CATEGORIES.at(-1) ? lastTransitioned : await openCategory(page, requested);
-  if (!requestedReady) throw new Error("Requested tab did not confirm navigation");
+  await openMatter(page);
+  if (!await openCategory(page, requested)) throw new Error("Requested tab did not confirm navigation");
   const documents = await downloadUpToTen(page, counts[requested]);
   const result = {
     matter_number: matter,
@@ -149,6 +187,7 @@ try {
     initial_filing_date: labeledValue(headerText, "Initial Filing(?: Date)?"),
     final_filing_date: labeledValue(headerText, "Final Filing(?: Date)?"),
     counts,
+    count_method: countMethod,
     documents,
   };
   if (output) {
