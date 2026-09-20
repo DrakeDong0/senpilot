@@ -29,11 +29,23 @@ class MailTests(unittest.TestCase):
                 ("OK", [b"7"]),
                 ("OK", [(b"7 (BODY[]", message.as_bytes())]),
             ]
-            found = Mailbox("imap.example.com", "agent", "secret").fetch_unseen()
+            found = Mailbox("imap.example.com", "agent", "secret", "Senpilot").fetch_unseen()
             self.assertEqual(len(found), 1)
             self.assertEqual(found[0].uid, b"7")
             client.uid.assert_any_call("fetch", b"7", "(BODY.PEEK[])")
-            self.assertEqual(client.select.call_args.kwargs, {"readonly": True})
+            client.select.assert_called_once_with("Senpilot", readonly=True)
+
+    def test_mailbox_requires_dedicated_folder(self):
+        with self.assertRaises(ValueError):
+            Mailbox("imap.example.com", "agent", "secret", "INBOX")
+
+    def test_mark_seen_uses_dedicated_folder(self):
+        with patch("senpilot.mail.imaplib.IMAP4_SSL") as factory:
+            client = factory.return_value.__enter__.return_value
+            client.select.return_value = ("OK", [])
+            client.uid.return_value = ("OK", [])
+            Mailbox("imap.example.com", "agent", "secret", "Senpilot").mark_seen(b"7")
+            client.select.assert_called_once_with("Senpilot")
 
     def test_ambiguous_request_can_be_clarified(self):
         message = EmailMessage()

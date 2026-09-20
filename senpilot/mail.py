@@ -42,10 +42,13 @@ def parse_incoming(uid: bytes, raw_message: bytes) -> IncomingMail:
 
 
 class Mailbox:
-    def __init__(self, host: str, username: str, password: str, port: int = 993):
+    def __init__(self, host: str, username: str, password: str, folder: str, port: int = 993):
+        if not folder.strip() or folder.strip().upper() == "INBOX":
+            raise ValueError("dedicated_imap_folder_required")
         self.host = host
         self.username = username
         self.password = password
+        self.folder = folder
         self.port = port
 
     def fetch_unseen(self) -> list[IncomingMail]:
@@ -53,7 +56,7 @@ class Mailbox:
         results = []
         with imaplib.IMAP4_SSL(self.host, self.port) as client:
             client.login(self.username, self.password)
-            status, _ = client.select("INBOX", readonly=True)
+            status, _ = client.select(self.folder, readonly=True)
             if status != "OK":
                 raise RuntimeError("imap_select_failed")
             status, data = client.uid("search", None, "UNSEEN")
@@ -73,7 +76,7 @@ class Mailbox:
         """Mark a message read after its reply has been sent."""
         with imaplib.IMAP4_SSL(self.host, self.port) as client:
             client.login(self.username, self.password)
-            status, _ = client.select("INBOX")
+            status, _ = client.select(self.folder)
             if status != "OK":
                 raise RuntimeError("imap_select_failed")
             status, _ = client.uid("store", uid, "+FLAGS", "(\\Seen)")
@@ -103,6 +106,7 @@ def mailbox_from_env() -> Mailbox:
         os.environ["SENPILOT_IMAP_HOST"],
         os.environ["SENPILOT_EMAIL_USER"],
         os.environ["SENPILOT_EMAIL_PASSWORD"],
+        os.environ["SENPILOT_IMAP_FOLDER"],
         int(os.environ.get("SENPILOT_IMAP_PORT", "993")),
     )
 

@@ -95,7 +95,7 @@ def run_once(
     agent_address: str,
     max_attachment_bytes: int = 20 * 1024 * 1024,
 ) -> int:
-    """Process the currently unseen inbox messages once; return the processed count."""
+    """Process the currently unseen messages in the configured folder once."""
     messages = mailbox.fetch_unseen()
     for incoming in messages:
         process_incoming(incoming, mailbox, sender, retrieve, agent_address, max_attachment_bytes)
