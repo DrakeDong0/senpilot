@@ -79,3 +79,8 @@ python3 -m unittest discover -s tests -v
 The browser-only command keeps downloads in `artifacts/`, which Git ignores. The email worker uses a temporary directory that is removed after processing. `DESIGN.md` describes possible production extensions; `IMPLEMENTATION.md` records the current implementation and verification history.
 
 The browser retrieval has been exercised against the live UARB site. The full email send/receive flow and partial-download failure case still need live acceptance testing with a configured mailbox.
+
+## Improvements
+
+- Add bounded retries for temporary UARB connection or download failures, with logs that identify the failed step.
+- Add a durable job record so a restart or uncertain email send cannot cause duplicate replies.
